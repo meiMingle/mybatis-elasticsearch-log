@@ -25,11 +25,20 @@ repositories {
     }
     mavenCentral()
 }
+configurations {
+    val sqplugins = create("sqplugins") { isTransitive = false }
+    create("sqplugins_deps") {
+        extendsFrom(sqplugins)
+        isTransitive = true
+    }
+}
 
 // Dependencies are managed with Gradle version catalog - read more: https://docs.gradle.org/current/userguide/platforms.html#sub:version-catalog
 dependencies {
 //    implementation(libs.annotations)
     implementation("com.alibaba:druid:1.2.17")
+    "sqplugins"(":mybatis-plugin:8.12.0-SNAPSHOT")
+    "sqplugins"(":elasticsearch-plugin:8.12.0-SNAPSHOT")
 }
 
 val skywalkingAgentVersion = "8.15.0"
@@ -126,16 +135,25 @@ tasks {
         }
     }
 
+    fun copyPlugins(destinationDir: File, pluginName: Property<String>) {
+        copy {
+            from(project.configurations["sqplugins"])
+            into(file("$destinationDir/${pluginName.get()}/lib/skywalking-agent/plugins"))
+        }
+    }
+
     prepareSandbox {
         dependsOn(downloadSkywalkingAgentZipFile)
         doLast {
             copySkywalkingAgent(destinationDir, pluginName)
+            copyPlugins(destinationDir, pluginName)
         }
     }
     prepareTestingSandbox {
         dependsOn(downloadSkywalkingAgentZipFile)
         doLast {
             copySkywalkingAgent(destinationDir, pluginName)
+            copyPlugins(destinationDir, pluginName)
         }
     }
     // Configure UI tests plugin
