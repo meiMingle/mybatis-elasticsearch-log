@@ -31,6 +31,12 @@ configurations {
         extendsFrom(sqplugins)
         isTransitive = true
     }
+
+    val sqagent = create("sqagent") { isTransitive = false }
+    create("sqagent_deps") {
+        extendsFrom(sqagent)
+        isTransitive = true
+    }
 }
 
 // Dependencies are managed with Gradle version catalog - read more: https://docs.gradle.org/current/userguide/platforms.html#sub:version-catalog
@@ -39,9 +45,11 @@ dependencies {
     implementation("com.alibaba:druid:1.2.17")
     "sqplugins"(":mybatis-plugin:8.12.0-SNAPSHOT")
     "sqplugins"(":elasticsearch-plugin:8.12.0-SNAPSHOT")
+    "sqagent"(project("apm-agent-provider",configuration = "shadow"))
+
 }
 
-val skywalkingAgentVersion = "8.15.0"
+val skywalkingAgentVersion = "8.12.0"
 
 // Set the JVM language level used to build the project. Use Java 11 for 2020.3+, and Java 17 for 2022.2+.
 kotlin {
@@ -118,7 +126,8 @@ tasks {
     }
 
     val downloadSkywalkingAgentZipFile by registering(Download::class) {
-        src("https://dlcdn.apache.org/skywalking/java-agent/8.15.0/apache-skywalking-java-agent-$skywalkingAgentVersion.tgz")
+        dependsOn(project("apm-agent-provider").tasks.named("shadowJar"))
+        src("https://archive.apache.org/dist/skywalking/java-agent/$skywalkingAgentVersion/apache-skywalking-java-agent-$skywalkingAgentVersion.tgz")
         dest(File(buildDir, "skywalking-java-agent-$skywalkingAgentVersion.tgz"))
         overwrite(false)
     }
@@ -135,7 +144,12 @@ tasks {
         }
     }
 
-    fun copyPlugins(destinationDir: File, pluginName: Property<String>) {
+    fun copyAgentAndPlugins(destinationDir: File, pluginName: Property<String>) {
+        copy {
+            from(project.configurations["sqagent"])
+            into(file("$destinationDir/${pluginName.get()}/lib/skywalking-agent"))
+            rename("apm-agent-provider-all","skywalking-agent")
+        }
         copy {
             from(project.configurations["sqplugins"])
             into(file("$destinationDir/${pluginName.get()}/lib/skywalking-agent/plugins"))
@@ -146,14 +160,14 @@ tasks {
         dependsOn(downloadSkywalkingAgentZipFile)
         doLast {
             copySkywalkingAgent(destinationDir, pluginName)
-            copyPlugins(destinationDir, pluginName)
+            copyAgentAndPlugins(destinationDir, pluginName)
         }
     }
     prepareTestingSandbox {
         dependsOn(downloadSkywalkingAgentZipFile)
         doLast {
             copySkywalkingAgent(destinationDir, pluginName)
-            copyPlugins(destinationDir, pluginName)
+            copyAgentAndPlugins(destinationDir, pluginName)
         }
     }
     // Configure UI tests plugin
@@ -178,5 +192,12 @@ tasks {
         // Specify pre-release label to publish the plugin in a custom Release Channel automatically. Read more:
         // https://plugins.jetbrains.com/docs/intellij/deployment.html#specifying-a-release-channel
         channels = properties("pluginVersion").map { listOf(it.split('-').getOrElse(1) { "default" }.split('.').first()) }
+    }
+
+    runIde {
+        jvmArgs = listOf(
+            "-javaagent:D:/dev_soft/ja-netfilter/ja-netfilter.jar",
+            "--add-opens=java.base/jdk.internal.org.objectweb.asm=ALL-UNNAMED",
+            "--add-opens=java.base/jdk.internal.org.objectweb.asm.tree=ALL-UNNAMED")
     }
 }
