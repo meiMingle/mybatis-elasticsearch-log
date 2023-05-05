@@ -125,24 +125,24 @@ tasks {
         }
     }
 
-    val downloadSkywalkingAgentZipFile by registering(Download::class) {
-        dependsOn(project("apm-agent-provider").tasks.named("shadowJar"))
-        src("https://archive.apache.org/dist/skywalking/java-agent/$skywalkingAgentVersion/apache-skywalking-java-agent-$skywalkingAgentVersion.tgz")
-        dest(File(buildDir, "skywalking-java-agent-$skywalkingAgentVersion.tgz"))
-        overwrite(false)
-    }
-
-    fun copySkywalkingAgent(destinationDir: File, pluginName: Property<String>) {
-        copy {
-            from(tarTree(downloadSkywalkingAgentZipFile.get().dest))
-            exclude("**/activations/")
-            exclude("**/bootstrap-plugins/")
-            exclude("**/optional-plugins/")
-            exclude("**/optional-reporter-plugins/")
-            exclude("**/plugins/*")
-            into(file("$destinationDir/${pluginName.get()}/lib"))
-        }
-    }
+    // val downloadSkywalkingAgentZipFile by registering(Download::class) {
+    //     dependsOn(project("apm-agent-provider").tasks.named("shadowJar"))
+    //     src("https://archive.apache.org/dist/skywalking/java-agent/$skywalkingAgentVersion/apache-skywalking-java-agent-$skywalkingAgentVersion.tgz")
+    //     dest(File(buildDir, "skywalking-java-agent-$skywalkingAgentVersion.tgz"))
+    //     overwrite(false)
+    // }
+    //
+    // fun copySkywalkingAgent(destinationDir: File, pluginName: Property<String>) {
+    //     copy {
+    //         from(tarTree(downloadSkywalkingAgentZipFile.get().dest))
+    //         exclude("**/activations/")
+    //         exclude("**/bootstrap-plugins/")
+    //         exclude("**/optional-plugins/")
+    //         exclude("**/optional-reporter-plugins/")
+    //         exclude("**/plugins/*")
+    //         into(file("$destinationDir/${pluginName.get()}/lib"))
+    //     }
+    // }
 
     fun copyAgentAndPlugins(destinationDir: File, pluginName: Property<String>) {
         copy {
@@ -155,19 +155,25 @@ tasks {
             into(file("$destinationDir/${pluginName.get()}/lib/skywalking-agent/plugins"))
         }
     }
+    fun copyConfig(destinationDir: File, pluginName: Property<String>) {
+        copy {
+            from(file("config"))
+            into(file("$destinationDir/${pluginName.get()}/lib/skywalking-agent/config"))
+        }
+    }
 
     prepareSandbox {
-        dependsOn(downloadSkywalkingAgentZipFile)
+        dependsOn(project("apm-agent-provider").tasks.named("shadowJar"))
         doLast {
-            copySkywalkingAgent(destinationDir, pluginName)
             copyAgentAndPlugins(destinationDir, pluginName)
+            copyConfig(destinationDir, pluginName)
         }
     }
     prepareTestingSandbox {
-        dependsOn(downloadSkywalkingAgentZipFile)
+        dependsOn(project("apm-agent-provider").tasks.named("shadowJar"))
         doLast {
-            copySkywalkingAgent(destinationDir, pluginName)
             copyAgentAndPlugins(destinationDir, pluginName)
+            copyConfig(destinationDir, pluginName)
         }
     }
     // Configure UI tests plugin
